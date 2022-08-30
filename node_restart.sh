@@ -39,6 +39,9 @@ function print_usage() {
   echo ""
   echo "-d|--dry-run                        Just print what to do; don't actually do it"
   echo ""
+  echo ""
+  echo "-r|--restart                        Only restart (instead of deallocate/start)"
+  echo ""
   echo "-h|--help                           Print usage and exit."
 }
 
@@ -70,11 +73,11 @@ while [[ $# -gt 0 ]]; do
     force=true
     shift
     ;;
-  --dry-run)
+  -d | --dry-run)
     dryrun=true
     shift
     ;;
-  --restart-only)
+  -r | --restart-only)
     restart=true
     shift
     ;;
