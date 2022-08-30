@@ -10,10 +10,17 @@ regionDefault='<set your default here>'
 region=${REGION:-$regionDefault}
 force=false
 dryrun=false
+restart=false
 nodes=''
+
+function echoerr() { echo "$@" 1>&2; }
 
 function print_usage() {
   echo "Usage: $0 [<options>]"
+  echo ""
+  echo "-n|--node <node>                    The name of a node to restart."
+  echo "                                    By default, a rolling restart of all nodes"
+  echo "                                    is performed."
   echo ""
   echo "--resource-group <group-name>       The resource group of the cluster."
   echo "                                    Can also be set by RESOURCE_GROUP"
@@ -39,6 +46,11 @@ while [[ $# -gt 0 ]]; do
   key="$1"
 
   case $key in
+  -n | --node)
+    node="$2"
+    shift
+    shift
+    ;;
   --resource-group)
     resourceGroup="$2"
     shift
@@ -62,6 +74,10 @@ while [[ $# -gt 0 ]]; do
     dryrun=true
     shift
     ;;
+  --restart-only)
+    restart=true
+    shift
+    ;;
   -h | --help)
     print_usage
     exit 0
@@ -80,7 +96,7 @@ function wait_for_status() {
   reason=$2
   i=0
   while [[ $i -lt 60 ]]; do
-    status=$(kubectl get node $node -o "jsonpath={.status.conditions[?(.reason==\"$reason\")].type}")
+    status=$(kubectl get node "$node" -o "jsonpath={.status.conditions[?(.reason==\"$reason\")].type}")
     if [[ "$status" == "Ready" ]]; then
       echo "$reason after $((i * 2)) seconds"
       break
@@ -97,34 +113,61 @@ function wait_for_status() {
 
 function get_vmss_for_node() {
   node=$1
-  vmss=$(kubectl get node $1 -o json | jq -r '.spec.providerID | . |= split("/")[10]' | sort -u)
+
+  # we need to check if provider id is set due to bug https://github.com/kubernetes-sigs/cloud-provider-azure/issues/1155
+  providerId=$(kubectl get node "$node" -o json | jq -r '.spec.providerID // empty')
+
+  if [[ -z "$providerId" ]]; then
+    return 0
+  fi
+
+  vmss=$(kubectl get node "$node" -o json | jq -r '.spec.providerID | . |= split("/")[10]' | sort -u)
   echo $vmss
 }
 
 function get_instance_id_for_node() {
   node=$1
-  id=$(kubectl get node $1 -o json | jq -r '.spec.providerID | . |= split("/")[12]' | sort -u)
+  id=$(kubectl get node "$node" -o json | jq -r '.spec.providerID | . |= split("/")[12]' | sort -u)
   echo $id
 }
 
 function restart_node() {
   node=$1
   vmss=$(get_vmss_for_node "$node")
+
+  YELLOW='\033[1;33m'
+  NC='\033[0m' # No Color
+
+  if [[ -z "$vmss" ]]; then
+    echo -e "${YELLOW}Warning:${NC} Skipping restart of node $node as it has no ProviderID set (Azure issue - https://github.com/kubernetes-sigs/cloud-provider-azure/issues/1155)"
+    return 0
+  fi
+
   id=$(get_instance_id_for_node "$node")
 
-  echo "Deallocating VM $node"
-  if $dryrun; then
-    echo "az vmss deallocate -g $group -n $vmss --instance-ids $id"
+  if $restart; then
+    echo "Restarting VM $node"
+    if $dryrun; then
+      echo "az vmss restart -g $group -n $vmss --instance-ids $id"
+    else
+      az vmss restart -g "$group" -n "$vmss" --instance-ids "$id"
+    fi
   else
-    az vmss deallocate -g "$group" -n "$vmss" --instance-ids "$id"
+    echo "Deallocating VM $node"
+    if $dryrun; then
+      echo "az vmss deallocate -g $group -n $vmss --instance-ids $id"
+    else
+      az vmss deallocate -g "$group" -n "$vmss" --instance-ids "$id"
+    fi
+
+    echo "Starting VM $node"
+    if $dryrun; then
+      echo "az vmss start -g $group -n $vmss --instance-ids $id"
+    else
+      az vmss start -g "$group" -n "$vmss" --instance-ids "$id"
+    fi
   fi
 
-  echo "Starting VM $node"
-  if $dryrun; then
-    echo "az vmss start -g $group -n $vmss --instance-ids $id"
-  else
-    az vmss start -g "$group" -n "$vmss" --instance-ids "$id"
-  fi
 }
 
 if [ -z "$node" ]; then
