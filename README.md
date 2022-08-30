@@ -3,7 +3,7 @@
 A simple bash scripts that deallocates and starts all virtual machines that are represented as nodes
 within the cluster.
 
-By detail the script will perform the following actions:
+The script will perform the following actions in detail:
 
 * cordon node (disable scheduling)
 * drain node (if --force is not specified)
@@ -46,7 +46,7 @@ Usage: ./node_restart.sh [<options>]
 
 ## Known Issues
 
-Due to a known [bug](https://github.com/kubernetes-sigs/cloud-provider-azure/issues/1155) the
+Due to a known [bug](https://github.com/kubernetes-sigs/cloud-provider-azure/issues/1155), the
 ProviderID
 may not be set on the node within the AKS Cluster. Since this is used by this script to determine
 the VMSS
