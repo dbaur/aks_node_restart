@@ -1,7 +1,16 @@
-# Script restarting all nodes in an AKS cluster (Virtual Machine Scale Sets)
+# Script performing rolling restart of all nodes in an AKS cluster (Virtual Machine Scale Sets)
 
 A simple bash scripts that deallocates and starts all virtual machines that are represented as nodes
 within the cluster.
+
+By detail the script will perform the following actions:
+
+* cordon node (disable scheduling)
+* drain node (if --force is not specified)
+* deallocate the node in the VMSS
+* start the node in the VMSS
+* (if --restart is specified the node is only restarted)
+* uncordon the node
 
 ## Usage
 
