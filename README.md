@@ -35,6 +35,15 @@ Usage: ./node_restart.sh [<options>]
 -h|--help                           Print usage and exit.
 ```
 
+## Known Issues
+
+Due to a known [bug](https://github.com/kubernetes-sigs/cloud-provider-azure/issues/1155) the
+ProviderID
+may not be set on the node within the AKS Cluster. Since this is used by this script to determine
+the VMSS
+and the instance_id, nodes not having the ProviderID will be skipped and a warning is issued.
+
 ## Thanks
 
-Heavily based on this [script](https://gist.github.com/tomasaschan/9dbc9180d313ad8cae57f62ce229610b).
+Heavily based on this [script](https://gist.github.com/tomasaschan/9dbc9180d313ad8cae57f62ce229610b)
+.
